@@ -6,7 +6,7 @@
 When I first tried to submit predictions, I realized that AutoGluon produced continuous (float) values, but the count column represents the number of bike rentals, which should be non-negative integers. While the submission was accepted by Kaggle without rounding, I ensured that any negative predictions were clipped to zero to maintain logical correctness. I chose not to round the predictions to integers since the submission still worked, but ideally, rounding would improve interpretability and potentially the score.
 
 ### What was the top ranked model that performed?
-After running AutoGluon with default settings, the top-performing model was WeightedEnsemble_L3, which achieved a validation RMSE of −53.12. This ensemble model combined predictions from earlier level-2 models and outperformed all individual learners.
+After running AutoGluon with default settings, the top-performing model was WeightedEnsemble_L3, which achieved a validation RMSE of −53.11. This ensemble model combined predictions from earlier level-2 models and outperformed all individual learners.
 Notably, level-1 models like CatBoost, LightGBM, and ExtraTrees performed significantly worse, with RMSEs above −124. This demonstrates how stacking boosted performance substantially.
 
 ## Exploratory data analysis and feature creation
@@ -40,49 +40,29 @@ Behavioral Patterns (Barplots):
 
 
 ### How much better did your model preform after adding additional features and why do you think that is?
-To better support modeling and simplify relationships, the following transformations were applied:
-Datetime decomposition: Extracted year, month, dayofweek, and hour from the datetime column.
-Categorical conversion: Converted season and weather to categorical types to reflect their nominal nature.
-    Feature removal:
-    Dropped atemp due to its high correlation with temp.
-    Dropped casual and registered from training to avoid data leakage (they sum to count).
-    These changes aimed to reduce redundancy, remove target leakage, and highlight informative temporal patterns.
-
-Performance improvement:
-After adding these features and preprocessing steps, the best model — the WeightedEnsemble_L3 — improved its validation RMSE from approximately -53.12 (initial run) to -30.42, a significant reduction in error. Among individual base models, LightGBM, Random Forest, and CatBoost all showed marked improvements, with LightGBM_BAG_L2 achieving an RMSE of -30.65, down from around -55.04 initially.
-
-This substantial performance gain is likely due to:
-    Enhanced temporal representation: By decomposing the datetime variable, the model could capture complex time-dependent patterns in bike rental demand, such as peak hours, weekday/weekend effects, and seasonal variations.
-    Reduced multicollinearity and leakage: Removing highly correlated and target-leaking features improved the model’s generalization and prevented overfitting.
-    Better handling of categorical variables: Treating season and weather as categorical variables allowed tree-based models to split on these discrete factors more effectively.
-Overall, the additional feature engineering and careful preprocessing enabled the models to better understand underlying data structures and produce more accurate demand predictions.
+Adding new features and preprocessing steps significantly improved performance, reducing RMSE from 53.10 (initial) to 36.03. Key changes included:
+Datetime decomposition into year, month, dayofweek, and hour to capture time-based patterns.
+New features like temp_category and activity_level added behavioral insights.
+One-hot encoding applied to categorical variables for better model compatibility.
+Removed atemp, casual, and registered to avoid redundancy and target leakage.
+These changes helped models capture peak usage times, seasonality, and categorical effects more effectively. Feature engineering contributed more to performance gains than hyperparameter tuning in this case.
 
 ## Hyper parameter tuning
 ### How much better did your model preform after trying different hyper parameters?
-Although hyperparameter tuning is typically expected to enhance model performance, in this case, none of the tuned models outperformed the version trained with additional features. The RMSE dropped significantly from 53.12 (initial) to 30.42 after feature engineering, but subsequent HPO attempts resulted in higher RMSE values.
+Hyperparameter tuning did not improve performance beyond the feature-engineered model. RMSE dropped from 53.10 to 36.03 after feature engineering, while all HPO attempts resulted in slightly higher RMSEs (36.23–36.41), even with increased time and best_quality mode.
+
+Why?
+Feature engineering captured most predictive signals. Without expanding the search space or model diversity, tuning had limited effect.
 
 Model	RMSE
-initial	53.12
-add_features	30.42
-hpo1	37.11
-hpo2	33.34
-hpo3	33.61
-
-Initial model: Default features and parameters, serving as the baseline.
-Add features: Incorporating engineered features led to the most significant performance gain, reducing RMSE by over 40%.
-HPO1–HPO3: These runs involved hyperparameter tuning with various presets and model sets, but RMSE remained higher than the add_features model.
-
-Why hyperparameter tuning underperformed:
-The likely reason hyperparameter tuning did not surpass the add_features baseline is that the search space was too constrained—either due to limited ranges, insufficiently diverse model types, or short tuning time. Additionally, AutoGluon's default ensemble strategy is often already quite competitive; if the parameter space isn't meaningfully broader or deeper, further tuning may yield diminishing returns. This is especially true when the gain from feature engineering already captures most of the available signal in the data.
-
-Conclusion:
-In this case, feature quality had a greater impact than hyperparameter tuning. HPO may still be valuable, but to be effective, it likely needs a wider or more customized search space, longer training time, or additional model diversity.
+initial	53.103332
+add_features	36.025632
+hpo1	36.368298
+hpo2	36.408183
+hpo3	36.231506
 
 ### If you were given more time with this dataset, where do you think you would spend more time?
-If given more time, I would focus on two key areas: improving the hyperparameter tuning process and expanding feature engineering efforts.
-On the tuning side, I would begin by closely examining AutoGluon's default parameters, which I initially overlooked. My current approach started with a deterministic search using predefined values, without understanding the baseline configuration or adapting the search space dynamically. As a result, the tuning process may have been too constrained or misaligned with the model's strengths, leading to limited performance gains—none of the HPO experiments outperformed the add_features model in RMSE. In future iterations, I would adopt a more exploratory, data-driven tuning strategy, potentially using Bayesian optimization and allocating more time and resources to broader, more flexible search spaces.
-Additionally, I would invest more time in feature engineering, which proved highly effective in earlier experiments. I would explore categorizing continuous variables, such as grouping temperature ranges into meaningful bands (e.g., cold, mild, hot), and creating aggregated weather categories to capture latent patterns. These types of domain-informed features could enrich the model's input space and improve performance more effectively than tuning alone.
-Overall, a combination of well-informed hyperparameter tuning and richer feature engineering would be my main focus to further enhance the model.
+I would focus on improving hyperparameter tuning by exploring AutoGluon’s defaults, expanding the search space, and using smarter strategies like Bayesian optimization. I’d also deepen feature engineering, such as binning temperatures or aggregating weather types, since earlier feature work led to the largest performance gains.
 
 ### Create a table with the models you ran, the hyperparameters modified, and the kaggle score.
 ![hpo_scores.png](img/hpo_scores.png)
@@ -96,6 +76,5 @@ Overall, a combination of well-informed hyperparameter tuning and richer feature
 ![model_test_score.png](img/model_test_score.png)
 
 ## Summary
-This project demonstrated the effectiveness of AutoGluon in predicting bike sharing demand through a combination of exploratory data analysis, feature engineering, and modeling. Initial runs with default features and parameters provided a baseline RMSE of about 53.12. By decomposing the datetime variable and refining categorical features—while removing redundant and leakage-prone variables—the model achieved a substantial improvement, lowering RMSE to 30.42.
-Attempts at hyperparameter tuning did not further reduce error beyond this level, likely due to constrained search spaces and the already competitive default ensemble strategy within AutoGluon. This highlights that careful feature engineering can yield greater performance gains than tuning alone in this context.
-Given more time, expanding feature engineering (e.g., categorizing temperature and weather) and adopting more adaptive, exploratory hyperparameter optimization strategies would be promising directions. Overall, the project underlines the critical role of domain-aware feature design combined with automated machine learning frameworks in solving real-world regression problems effectively.
+AutoGluon effectively modeled bike-sharing demand, but the largest performance gains came from feature engineering, not tuning. Enhancing temporal and categorical features cut RMSE from ~53 to ~36. Hyperparameter tuning, limited by narrow search space and already strong defaults, failed to improve further.
+Going forward, deeper feature transformations and a more flexible tuning strategy would likely yield greater benefits. This project highlights the outsized impact of informed feature design over parameter tweaking in automated ML workflows.
